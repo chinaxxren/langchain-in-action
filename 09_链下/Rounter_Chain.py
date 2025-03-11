@@ -4,9 +4,8 @@ https://time.geekbang.org/column/intro/100617601
 import warnings
 warnings.filterwarnings('ignore')
 
-# 设置OpenAI API密钥
-import os
-os.environ["OPENAI_API_KEY"] = 'Your Key'
+from dotenv import load_dotenv  # 用于加载环境变量
+load_dotenv()  # 加载 .env 文件中的环境变量
 
 # 构建两个场景的模板
 flower_care_template = """
@@ -59,6 +58,8 @@ for info in prompt_infos:
     )
     chain_map[info["key"]] = chain
 
+print("*" * 60)
+
 # 构建路由链
 from langchain.chains.router.llm_router import LLMRouterChain, RouterOutputParser
 from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMPLATE as RounterTemplate
@@ -74,10 +75,15 @@ router_prompt = PromptTemplate(
 )
 print("路由提示:\n", router_prompt)
 
+#工作流程：
+# - 接收用户输入的问题
+# - 分析问题的内容和意图
+# - 根据预定义的目标（destinations）选择最合适的处理链
+# - 将问题转发给选中的链处理
 router_chain = LLMRouterChain.from_llm(
-    llm,
-    router_prompt,
-    verbose=True
+    llm,            # 语言模型
+    router_prompt,  # 路由提示模板
+    verbose=True    # 显示详细信息
 )
 
 # 构建默认链
@@ -92,6 +98,15 @@ default_chain = ConversationChain(
 # 构建多提示链
 from langchain.chains.router import MultiPromptChain
 
+#- 在这个例子中，路由会在两个专门的链之间选择：
+# - flower_care ：处理花卉护理相关问题
+# - flower_decoration ：处理花卉装饰相关问题
+# - 如果都不匹配，则使用默认链处理
+
+# - 实际应用效果：
+# - "如何为玫瑰浇水？" → 路由到 flower_care 链
+# - "如何为婚礼场地装饰花朵？" → 路由到 flower_decoration 链
+# - "如何区分阿豆和罗豆？" → 使用默认链处理
 chain = MultiPromptChain(
     router_chain=router_chain,
     destination_chains=chain_map,
