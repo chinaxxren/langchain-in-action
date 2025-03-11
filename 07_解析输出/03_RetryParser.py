@@ -1,6 +1,10 @@
 '''欢迎来到LangChain实战课
 https://time.geekbang.org/column/intro/100617601
 作者 黄佳'''
+
+from dotenv import load_dotenv
+load_dotenv()
+
 # 定义一个模板字符串，这个模板将用于生成提问
 template = """Based on the user question, provide an Action and Action Input for what step should be taken.
 {format_instructions}
@@ -30,21 +34,19 @@ prompt_value = prompt.format_prompt(query="What are the colors of Orchid?")
 bad_response = '{"action": "search"}'
 # parser.parse(bad_response) # 如果直接解析，它会引发一个错误
 
-# 设置OpenAI API密钥
-import os
-os.environ["OPENAI_API_KEY"] = 'Your OpenAI API Key'
 
-# 尝试用OutputFixingParser来解决这个问题
+# 使用OutputFixingParser来解决这个问题
 from langchain.output_parsers import OutputFixingParser
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI  # 更新导入路径
 
 fix_parser = OutputFixingParser.from_llm(parser=parser, llm=ChatOpenAI())
 parse_result = fix_parser.parse(bad_response)
 print('OutputFixingParser的parse结果:',parse_result)
 
-# 初始化RetryWithErrorOutputParser，它会尝试再次提问来得到一个正确的输出
+# 初始化RetryWithErrorOutputParser
 from langchain.output_parsers import RetryWithErrorOutputParser
-from langchain.llms import OpenAI
+from langchain_openai import OpenAI  # 更新导入路径
+
 retry_parser = RetryWithErrorOutputParser.from_llm(
     parser=parser, llm=OpenAI(temperature=0)
 )
