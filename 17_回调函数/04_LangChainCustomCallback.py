@@ -1,6 +1,6 @@
-# 设置OpenAI API密钥
-import os
-os.environ["OPENAI_API_KEY"] = 'Your OpenAI Key'
+# 设置OpenAI和SERPAPI的API密钥
+from dotenv import load_dotenv  # 用于加载环境变量
+load_dotenv()  # 加载 .env 文件中的环境变量
 
 import asyncio
 from typing import Any, Dict, List
