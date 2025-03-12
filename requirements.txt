@@ -28,7 +28,8 @@ openai==1.31.1
 chromadb==0.6.3
 transformers==4.41.2
 torch==2.0.0
-playwright==1.41.2  # 添加 playwright 依赖
+faiss-cpu==1.7.4  # 添加 FAISS CPU 版本
+playwright==1.41.2
 
 # 其他工具包
 python-dotenv==1.0.1

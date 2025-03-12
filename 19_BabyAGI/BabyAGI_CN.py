@@ -1,21 +1,46 @@
-# 设置API Key
-import os
-os.environ["OPENAI_API_KEY"] = 'Your OpenAI Key'
+# 这是一个基于 BabyAGI 框架的任务规划和执行系统，主要包含以下几个核心部分：
 
-# 导入所需的库和模块
+# 1. 核心组件：
+# - TaskCreationChain : 负责生成新任务
+# - TaskPrioritizationChain : 负责任务优先级排序
+# - ExecutionChain : 负责执行具体任务
+# - BabyAGI : 主控制器，协调各个组件工作
+# # 初始化
+# OBJECTIVE = "分析一下北京市今天的气候情况，写出鲜花储存策略。"
+# max_iterations = 6  # 最大迭代次数
+
+# # 循环执行
+# while 任务未完成 and 未达到最大迭代次数:
+#     1. 获取并执行当前任务
+#     2. 存储任务结果
+#     3. 基于结果创建新任务
+#     4. 对任务列表重新排序
+# 3. 关键特性：
+# - 使用向量存储（FAISS）保存任务结果
+# - 自动任务分解和优先级管理
+# - 任务执行过程可追踪
+# - 支持最大迭代次数限制
+# 4. 技术栈：
+# - LangChain 框架
+# - OpenAI API
+# - FAISS 向量数据库
+# - Pydantic 数据模型
+
+# 导入环境变量管理库
+from dotenv import load_dotenv
+load_dotenv()
+
+# 更新导入路径
 from collections import deque
 from typing import Dict, List, Optional, Any
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.llms import BaseLLM, OpenAI
-from langchain.vectorstores.base import VectorStore
-from pydantic import BaseModel, Field
+from langchain_openai import OpenAIEmbeddings  # 更新
+from langchain_openai import OpenAI  # 更新
 from langchain.chains.base import Chain
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS  # 更新
 import faiss
-from langchain.docstore import InMemoryDocstore
-
+from langchain_community.docstore.in_memory import InMemoryDocstore  # 更新
 
 # 定义嵌入模型
 embeddings_model = OpenAIEmbeddings()
