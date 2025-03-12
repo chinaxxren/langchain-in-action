@@ -1,11 +1,11 @@
-# 设置OpenAI和SERPAPI的API密钥
 from dotenv import load_dotenv  # 用于加载环境变量
 load_dotenv()  # 加载 .env 文件中的环境变量
 
 import asyncio
 from typing import Any, Dict, List
 
-from langchain.chat_models import ChatOpenAI
+# 更新导入路径
+from langchain_openai import ChatOpenAI
 from langchain.schema import LLMResult, HumanMessage
 from langchain.callbacks.base import AsyncCallbackHandler, BaseCallbackHandler
 
