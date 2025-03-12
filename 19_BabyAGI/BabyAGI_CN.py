@@ -41,13 +41,17 @@ from langchain.chains.base import Chain
 from langchain_community.vectorstores import FAISS  # 更新
 import faiss
 from langchain_community.docstore.in_memory import InMemoryDocstore  # 更新
+from langchain.llms.base import BaseLLM  # 添加BaseLLM导入
+from pydantic import Field, BaseModel  # 添加Field和BaseModel导入
+from langchain.vectorstores.base import VectorStore  # 添加VectorStore导入
 
 # 定义嵌入模型
 embeddings_model = OpenAIEmbeddings()
 # 初始化向量存储
 embedding_size = 1536
 index = faiss.IndexFlatL2(embedding_size)
-vectorstore = FAISS(embeddings_model.embed_query, index, InMemoryDocstore({}), {})
+# 修复FAISS初始化方式
+vectorstore = FAISS(embedding_function=embeddings_model, index=index, docstore=InMemoryDocstore({}), index_to_docstore_id={})
 
 # 任务生成链
 class TaskCreationChain(LLMChain):
@@ -64,6 +68,7 @@ class TaskCreationChain(LLMChain):
             " Based on the result, create new tasks to be completed"
             " by the AI system that do not overlap with incomplete tasks."
             " Return the tasks as an array."
+            "The maximum length of the array is three" # 限制任务数量,我添加的
         )
         prompt = PromptTemplate(
             template=task_creation_template,
@@ -115,7 +120,11 @@ class ExecutionChain(LLMChain):
             input_variables=["objective", "context", "task"],
         )
         return cls(prompt=prompt, llm=llm, verbose=verbose)
-    
+
+# 根据当前任务的执行结果生成新任务
+# - 将未完成任务转换为字符串
+# - 调用任务创建链生成新任务
+# - 处理响应并返回新任务列表    
 def get_next_task(
     task_creation_chain: LLMChain,
     result: Dict,
@@ -123,70 +132,154 @@ def get_next_task(
     task_list: List[str],
     objective: str,
 ) -> List[Dict]:
-    """Get the next task."""
+    """获取下一个任务。"""
+    # 将未完成的任务列表转换为逗号分隔的字符串
     incomplete_tasks = ", ".join(task_list)
-    response = task_creation_chain.run(
-        result=result,
-        task_description=task_description,
-        incomplete_tasks=incomplete_tasks,
-        objective=objective,
+    # 调用任务创建链，根据当前任务结果生成新任务
+    response = task_creation_chain.invoke(
+        {"result": result,  # 当前任务的执行结果
+         "task_description": task_description,  # 当前任务的描述
+         "incomplete_tasks": incomplete_tasks,  # 未完成的任务列表
+         "objective": objective}  # 总体目标
     )
-    new_tasks = response.split("\n")
+    # 从响应中提取文本内容
+    response_text = response.get("text", "")
+    # 将响应文本按行分割，每行代表一个新任务
+    new_tasks = response_text.split("\n")
+    # 过滤空行并将每个任务转换为字典格式返回
     return [{"task_name": task_name} for task_name in new_tasks if task_name.strip()]
 
-
+# 对任务列表进行优先级排序
+# - 提取任务名称
+# - 调用任务优先级链进行排序
+# - 解析响应，处理任务ID和名称
+# - 返回排序后的任务列表
 def prioritize_tasks(
     task_prioritization_chain: LLMChain,
     this_task_id: int,
     task_list: List[Dict],
     objective: str,
 ) -> List[Dict]:
-    """Prioritize tasks."""
+    """对任务进行优先级排序。"""
+    # 提取所有任务的名称
     task_names = [t["task_name"] for t in task_list]
+    # 计算下一个任务ID
     next_task_id = int(this_task_id) + 1
-    response = task_prioritization_chain.run(
-        task_names=task_names, next_task_id=next_task_id, objective=objective
+    # 调用任务优先级链，对任务进行重新排序
+    response = task_prioritization_chain.invoke(
+        {"task_names": task_names,  # 所有任务名称列表
+         "next_task_id": next_task_id,  # 下一个任务ID
+         "objective": objective}  # 总体目标
     )
-    new_tasks = response.split("\n")
+    # 从响应中提取文本内容
+    response_text = response.get("text", "")
+    # 将响应文本按行分割，每行代表一个优先级排序后的任务
+    new_tasks = response_text.split("\n")
+    # 初始化优先级排序后的任务列表
     prioritized_task_list = []
+    # 处理每个任务字符串
     for task_string in new_tasks:
+        # 跳过空行
         if not task_string.strip():
             continue
+        # 去除首尾空白字符
+        task_string = task_string.strip()
+        # 按第一个点分割，分离任务ID和任务名称
         task_parts = task_string.strip().split(".", 1)
+        # 确保分割后有两部分
         if len(task_parts) == 2:
+            # 提取任务ID并去除空白字符
             task_id = task_parts[0].strip()
+            # 移除任务ID中的#号
+            task_id = task_id.replace('#', '')
+            # 确保任务ID不为空，如果为空则使用默认值
+            if not task_id:
+                task_id = str(next_task_id)
+                next_task_id += 1
+            # 提取任务名称并去除空白字符
             task_name = task_parts[1].strip()
+            # 将任务添加到优先级排序后的列表中
             prioritized_task_list.append({"task_id": task_id, "task_name": task_name})
+    # 返回优先级排序后的任务列表
     return prioritized_task_list
 
 
+# 从向量存储中获取与查询最相关的前k个任务
 def _get_top_tasks(vectorstore, query: str, k: int) -> List[str]:
-    """Get the top k tasks based on the query."""
+    """获取与查询最相关的前k个任务。"""
+    # 使用向量存储的相似度搜索功能
     results = vectorstore.similarity_search_with_score(query, k=k)
+    # 如果没有找到相关任务，返回空列表
     if not results:
         return []
+    # 按相似度得分排序并提取任务信息
     sorted_results, _ = zip(*sorted(results, key=lambda x: x[1], reverse=True))
+    # 返回任务描述列表
     return [str(item.metadata["task"]) for item in sorted_results]
 
 
+# 执行具体任务的函数
 def execute_task(
     vectorstore, execution_chain: LLMChain, objective: str, task: str, k: int = 5
 ) -> str:
-    """Execute a task."""
+    """执行单个任务。"""
+    # 获取与当前目标相关的历史任务作为上下文
     context = _get_top_tasks(vectorstore, query=objective, k=k)
-    return execution_chain.run(objective=objective, context=context, task=task)
+    # 调用执行链完成任务
+    response = execution_chain.invoke(
+        {"objective": objective,  # 总体目标
+         "context": context,      # 相关历史任务上下文
+         "task": task}           # 当前需要执行的任务
+    )
+    # 返回任务执行结果
+    return response.get("text", "")
+
+
+# BabyAGI类的辅助方法
+def add_task(self, task: Dict):
+    """添加新任务到任务列表。"""
+    self.task_list.append(task)
+
+def print_task_list(self):
+    """打印当前任务列表。"""
+    print("\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m\033[0m")
+    for t in self.task_list:
+        print(str(t["task_id"]) + ": " + t["task_name"])
+
+def print_next_task(self, task: Dict):
+    """打印即将执行的任务。"""
+    print("\033[92m\033[1m" + "\n*****NEXT TASK*****\n" + "\033[0m\033[0m")
+    print(str(task["task_id"]) + ": " + task["task_name"])
+
+def print_task_result(self, result: str):
+    """打印任务执行结果。"""
+    print("\033[93m\033[1m" + "\n*****TASK RESULT*****\n" + "\033[0m\033[0m")
+    print(result)
 
 
 # BabyAGI 主类
 class BabyAGI(Chain, BaseModel):
     """BabyAGI代理的控制器模型"""
 
+    # 任务队列，存储所有待执行的任务
     task_list: deque = Field(default_factory=deque)
+    
+    # 任务创建链，负责根据已完成任务的结果生成新任务
     task_creation_chain: TaskCreationChain = Field(...)
+    
+    # 任务优先级链，负责对任务列表进行优先级排序
     task_prioritization_chain: TaskPrioritizationChain = Field(...)
+    
+    # 任务执行链，负责执行具体任务
     execution_chain: ExecutionChain = Field(...)
+    
+    # 任务ID计数器，用于为新任务分配唯一ID
     task_id_counter: int = Field(1)
+    
+    # 向量存储，用于存储任务结果并支持相似性搜索
     vectorstore: VectorStore = Field(init=False)
+    
+    # 最大迭代次数，控制系统运行的轮数，防止无限循环
     max_iterations: Optional[int] = None
 
     class Config:
@@ -220,34 +313,53 @@ class BabyAGI(Chain, BaseModel):
 
     def _call(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Run the agent."""
+        # 从输入中获取目标任务
         objective = inputs["objective"]
+        # 获取第一个任务，如果没有指定则默认为"Make a todo list"
         first_task = inputs.get("first_task", "Make a todo list")
+        # 将第一个任务添加到任务列表中
         self.add_task({"task_id": 1, "task_name": first_task})
+        # 初始化迭代计数器
         num_iters = 0
+        # 开始主循环
         while True:
+            # 检查任务列表是否有任务
             if self.task_list:
+                # 打印当前任务列表
                 self.print_task_list()
-
-                # Step 1: Pull the first task
+        
+                # 步骤1: 获取优先级最高的任务（队列头部的任务）
                 task = self.task_list.popleft()
+                # 打印即将执行的任务
                 self.print_next_task(task)
-
-                # Step 2: Execute the task
+        
+                # 步骤2: 执行任务
                 result = execute_task(
                     self.vectorstore, self.execution_chain, objective, task["task_name"]
                 )
-                this_task_id = int(task["task_id"])
+                # 确保task_id是整数，处理可能的格式问题
+                try:
+                    # 移除任务ID中的#号并转换为整数
+                    task_id_str = str(task["task_id"]).replace('#', '')
+                    # 如果ID为空则使用当前计数器值
+                    this_task_id = int(task_id_str) if task_id_str else self.task_id_counter
+                except ValueError:
+                    # 如果转换失败，使用当前计数器值
+                    this_task_id = self.task_id_counter
+                
+                # 打印任务执行结果
                 self.print_task_result(result)
-
-                # Step 3: Store the result in Pinecone
+        
+                # 步骤3: 将结果存储到向量数据库中
                 result_id = f"result_{task['task_id']}_{num_iters}"
+                # 添加文本到向量存储，包含任务元数据
                 self.vectorstore.add_texts(
                     texts=[result],
                     metadatas=[{"task": task["task_name"]}],
                     ids=[result_id],
                 )
-
-                # Step 4: Create new tasks and reprioritize task list
+        
+                # 步骤4: 根据执行结果创建新任务
                 new_tasks = get_next_task(
                     self.task_creation_chain,
                     result,
@@ -255,10 +367,13 @@ class BabyAGI(Chain, BaseModel):
                     [t["task_name"] for t in self.task_list],
                     objective,
                 )
+                # 为每个新任务分配ID并添加到任务列表
                 for new_task in new_tasks:
                     self.task_id_counter += 1
                     new_task.update({"task_id": self.task_id_counter})
                     self.add_task(new_task)
+                    
+                # 步骤5: 对任务列表重新排序
                 self.task_list = deque(
                     prioritize_tasks(
                         self.task_prioritization_chain,
@@ -267,24 +382,36 @@ class BabyAGI(Chain, BaseModel):
                         objective,
                     )
                 )
+            # 增加迭代计数
             num_iters += 1
+            # 检查是否达到最大迭代次数
             if self.max_iterations is not None and num_iters == self.max_iterations:
+                # 打印任务结束信息
                 print(
                     "\033[91m\033[1m" + "\n*****TASK ENDING*****\n" + "\033[0m\033[0m"
                 )
+                # 跳出循环
                 break
+        # 返回空字典
         return {}
 
     @classmethod
     def from_llm(
         cls, llm: BaseLLM, vectorstore: VectorStore, verbose: bool = False, **kwargs
     ) -> "BabyAGI":
-        """Initialize the BabyAGI Controller."""
+        """初始化 BabyAGI 控制器。"""
+        # 创建任务生成链实例，用于根据已完成任务的结果生成新任务
         task_creation_chain = TaskCreationChain.from_llm(llm, verbose=verbose)
+        
+        # 创建任务优先级链实例，用于对任务列表进行优先级排序
         task_prioritization_chain = TaskPrioritizationChain.from_llm(
             llm, verbose=verbose
         )
+        
+        # 创建任务执行链实例，用于执行具体任务
         execution_chain = ExecutionChain.from_llm(llm, verbose=verbose)
+        
+        # 返回初始化后的 BabyAGI 实例
         return cls(
             task_creation_chain=task_creation_chain,
             task_prioritization_chain=task_prioritization_chain,
@@ -292,16 +419,31 @@ class BabyAGI(Chain, BaseModel):
             vectorstore=vectorstore,
             **kwargs,
         )
-    
+
 
 # 主执行部分
 if __name__ == "__main__":
-    OBJECTIVE = "分析一下北京市今天的气候情况，写出鲜花储存策略。"
+    # 定义系统的总体目标
+    # OBJECTIVE = "分析一下北京市今天的气候情况，写出鲜花储存策略。全部用中文回答。"
+    OBJECTIVE = "写出鲜花储存策略。全部用中文回答。"
+
+    # 初始化 OpenAI 语言模型，temperature=0 表示输出最确定的结果
     llm = OpenAI(temperature=0)
+    
+    # 设置是否输出详细日志
     verbose = False
+    
+    # 设置最大迭代次数，控制系统运行的轮数
     max_iterations: Optional[int] = 6
-    baby_agi = BabyAGI.from_llm(llm=llm, vectorstore=vectorstore, 
-                                verbose=verbose, 
-                                max_iterations=max_iterations)
-    baby_agi({"objective": OBJECTIVE})
+    
+    # 创建 BabyAGI 实例，初始化所有必要的组件
+    baby_agi = BabyAGI.from_llm(
+        llm=llm,                    # 语言模型
+        vectorstore=vectorstore,     # 向量存储
+        verbose=verbose,            # 是否输出详细日志
+        max_iterations=max_iterations  # 最大迭代次数
+    )
+    
+    # 启动系统，开始执行任务
+    baby_agi.invoke({"objective": OBJECTIVE})
 

@@ -1,0 +1,57 @@
+BabyAGI 和 CAMEL 的技术实现对比：
+
+1. 核心组件
+   - BabyAGI：
+     * TaskCreationChain：任务生成
+     * TaskPrioritizationChain：任务优先级排序
+     * ExecutionChain：任务执行
+     * FAISS 向量存储：存储任务结果
+   
+   - CAMEL：
+     * CAMELAgent：代理类
+     * SystemMessagePromptTemplate：系统提示模板
+     * HumanMessagePromptTemplate：人类提示模板
+     * ChatOpenAI：对话模型
+
+2. 数据结构
+   - BabyAGI：
+     * 使用 deque 存储任务队列
+     * 使用 Dict 存储任务信息
+     * 使用向量数据库存储执行结果
+   
+   - CAMEL：
+     * 使用 List 存储消息历史
+     * 使用 BaseMessage 及其子类管理消息
+
+3. 模型调用
+   - BabyAGI：
+     * 多个独立的 LLMChain
+     * 每个链负责特定功能
+     * 使用 invoke 方法执行任务
+   
+   - CAMEL：
+     * 单一的 ChatOpenAI 模型
+     * 通过不同的提示模板控制行为
+     * 使用 step 方法进行对话
+
+4. 状态管理
+   - BabyAGI：
+     * 通过向量存储维护任务上下文
+     * 使用任务ID追踪任务状态
+     * 动态更新任务优先级
+   
+   - CAMEL：
+     * 通过消息历史维护对话上下文
+     * 使用系统消息控制角色行为
+     * 线性的对话流程管理
+
+5. 扩展性
+   - BabyAGI：
+     * 可以添加新的任务链
+     * 可以替换向量存储实现
+     * 支持自定义任务生成逻辑
+   
+   - CAMEL：
+     * 可以定义新的角色
+     * 可以修改提示模板
+     * 支持自定义对话策略
