@@ -1,18 +1,26 @@
-# 设置OpenAI的API密钥
-import os
-os.environ["OPENAI_API_KEY"] = 'Your OpenAI Key'
+#embed_documents() ：
 
-# 导入内存存储库，该库允许我们在RAM中临时存储数据
+# - 接收一个文本列表作为输入
+# - 将每个文本转换为向量表示
+# - 自动处理缓存逻辑
+
+from dotenv import load_dotenv
+load_dotenv()
+
+# 导入内存存储库
 from langchain.storage import InMemoryStore
-
-# 创建一个InMemoryStore的实例
 store = InMemoryStore()
 
-# 导入与嵌入相关的库。OpenAIEmbeddings是用于生成嵌入的工具，而CacheBackedEmbeddings允许我们缓存这些嵌入
-from langchain.embeddings import OpenAIEmbeddings, CacheBackedEmbeddings
+# 更新导入路径
+from langchain_openai import OpenAIEmbeddings
+from langchain.embeddings import CacheBackedEmbeddings
 
-# 创建一个OpenAIEmbeddings的实例，这将用于实际计算文档的嵌入
-underlying_embeddings = OpenAIEmbeddings()
+import os
+# 创建 OpenAIEmbeddings 实例
+underlying_embeddings = OpenAIEmbeddings(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    base_url=os.getenv("OPENAI_API_BASE")
+)
 
 # 创建一个CacheBackedEmbeddings的实例。
 # 这将为underlying_embeddings提供缓存功能，嵌入会被存储在上面创建的InMemoryStore中。
@@ -26,3 +34,5 @@ embedder = CacheBackedEmbeddings.from_bytes_store(
 # 使用embedder为两段文本生成嵌入。
 # 结果，即嵌入向量，将被存储在上面定义的内存存储中。
 embeddings = embedder.embed_documents(["你好", "智能鲜花客服"])
+print(embeddings)
+
