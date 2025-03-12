@@ -1,0 +1,50 @@
+在这个 CAMEL 系统中，模板和消息有着明显的区别：
+
+1. 模板（Template）：
+
+```python
+# 模板是一个可重复使用的结构，包含占位符
+task_specifier_prompt = """这是一个{assistant_role_name}将帮助{user_role_name}完成的任务：{task}。
+请使其更具体化。请发挥你的创意和想象力。
+请用{word_limit}个或更少的词回复具体的任务。"""
+ ```
+
+特点：
+
+- 包含变量占位符（如 {assistant_role_name}）
+- 可以多次使用
+- 需要通过格式化才能生成实际消息
+- 用于定义对话结构
+2. 消息（Message）：
+```python
+# 消息是模板格式化后的具体实例
+task_specifier_msg = task_specifier_template.format_messages(
+    assistant_role_name=assistant_role_name,
+    user_role_name=user_role_name,
+    task=task,
+    word_limit=word_limit,
+)[0]
+ ```
+
+特点：
+
+- 包含具体内容
+- 是一次性的实例
+- 直接用于对话交互
+- 有明确的类型（SystemMessage/HumanMessage/AIMessage）
+关系：
+
+```python
+模板 (Template) 
+    ↓ format_messages()
+消息 (Message)
+    ↓ step()
+模型响应 (Response)
+ ```
+
+这种设计的优势：
+
+1. 提高代码复用性
+2. 保持消息格式一致性
+3. 便于维护和修改
+4. 支持动态内容生成

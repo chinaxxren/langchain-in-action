@@ -1,78 +1,95 @@
-# 这是一个基于 CAMEL (Communicative Agents for "Mind" 
-# Exploration of Large Language Models) 框架的对话系统实现
 
-# ====================== 1. 导入依赖 ======================
-# 导入环境变量管理库
+# 导入环境变量管理库并加载环境变量
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # 从.env文件加载环境变量到程序中
 
-# 导入类型提示支持
-from typing import List
-# 导入 OpenAI 聊天模型
+# 导入所需的库
+from typing import List  # 用于类型提示
+# 导入OpenAI聊天模型
 from langchain_openai import ChatOpenAI
 # 导入消息模板相关类
 from langchain.prompts.chat import (
-    SystemMessagePromptTemplate,  # 系统消息模板
-    HumanMessagePromptTemplate,   # 人类消息模板
+    SystemMessagePromptTemplate,  # 用于创建系统消息的模板
+    HumanMessagePromptTemplate,   # 用于创建人类消息的模板
 )
 # 导入消息类型相关类
 from langchain.schema import (
-    AIMessage,      # AI 消息类型
-    HumanMessage,   # 人类消息类型
-    SystemMessage,  # 系统消息类型
-    BaseMessage,    # 基础消息类型
+    AIMessage,      # AI生成的消息类型
+    HumanMessage,   # 人类输入的消息类型
+    SystemMessage,  # 系统指令的消息类型
+    BaseMessage,    # 所有消息类型的基类
 )
 
-# ====================== 2. 基础类定义 ======================
-# 定义 CAMEL Agent 类，用于管理对话
+# 定义CAMELAgent类，用于管理与语言模型的交互
 class CAMELAgent:
     def __init__(
         self,
-        system_message: SystemMessage,  # 系统消息
-        model: ChatOpenAI,             # OpenAI 聊天模型
+        system_message: SystemMessage,  # 初始化时的系统指令
+        model: ChatOpenAI,              # 使用的语言模型
     ) -> None:
-        """初始化 CAMELAgent 实例"""
         self.system_message = system_message  # 存储系统消息
         self.model = model                    # 存储模型实例
-        self.init_messages()                  # 初始化消息列表
+        self.init_messages()                  # 初始化消息历史
 
     def reset(self) -> None:
         """重置对话消息到初始状态"""
-        self.init_messages()
-        return self.stored_messages
+        self.init_messages()  # 调用初始化方法
+        return self.stored_messages  # 返回重置后的消息列表
 
     def init_messages(self) -> None:
-        """初始化消息列表，只包含系统消息"""
-        self.stored_messages = [self.system_message]
+        """初始化对话消息列表，只包含系统消息"""
+        self.stored_messages = [self.system_message]  # 创建只包含系统消息的列表
 
     def update_messages(self, message: BaseMessage) -> List[BaseMessage]:
-        """将新消息添加到消息历史中"""
-        self.stored_messages.append(message)
-        return self.stored_messages
+        """将新消息添加到对话历史中"""
+        self.stored_messages.append(message)  # 添加新消息
+        return self.stored_messages  # 返回更新后的消息列表
 
     def step(self, input_message: HumanMessage) -> AIMessage:
-        """处理输入消息并获取模型响应"""
-        messages = self.update_messages(input_message)  # 更新消息历史
-        output_message = self.model(messages)          # 获取模型响应
-        self.update_messages(output_message)           # 保存响应消息
-        return output_message
+        """执行一轮对话，获取模型响应"""
+        messages = self.update_messages(input_message)  # 添加输入消息到历史
 
-# ====================== 3. 基础配置 ======================
-# 设置角色和任务
-assistant_role_name = "花店营销专员"  # 助手角色
-user_role_name = "花店老板"          # 用户角色
+        # 将 self.model(messages) 改为 self.model.invoke(messages)
+        output_message = self.model.invoke(messages)  # 调用模型获取响应
+        self.update_messages(output_message)   # 将响应添加到历史
+
+        return output_message  # 返回模型响应
+    
+# 设置对话角色和任务
+assistant_role_name = "花店营销专员"  # 助手角色名称
+user_role_name = "花店老板"          # 用户角色名称
 task = "整理出一个夏季玫瑰之夜的营销活动的策略"  # 任务描述
-word_limit = 50  # 回复字数限制
+word_limit = 50  # 任务具体化的字数限制
 
-# ====================== 4. 提示模板定义 ======================
-# 4.1 任务具体化提示
-task_specifier_sys_msg = SystemMessage(content="你可以让任务更具体。")
+# 定义任务具体化的系统提示
+task_specifier_sys_msg = SystemMessage(content="你可以让任务更具体。")  # 创建系统消息
+# 定义任务具体化的提示模板
 task_specifier_prompt = """这是一个{assistant_role_name}将帮助{user_role_name}完成的任务：{task}。
 请使其更具体化。请发挥你的创意和想象力。
 请用{word_limit}个或更少的词回复具体的任务。不要添加其他任何内容。"""
 
-# 4.2 角色行为提示
-# 营销专员的行为指南
+# 创建任务具体化的消息模板
+task_specifier_template = HumanMessagePromptTemplate.from_template(
+    template=task_specifier_prompt  # 使用上面定义的提示模板
+)
+# 创建任务具体化的代理实例
+task_specify_agent = CAMELAgent(
+    task_specifier_sys_msg,  # 使用任务具体化系统消息
+    ChatOpenAI(model_name = 'gpt-4', temperature=1.0)  # 使用GPT-4模型，高创造性设置
+)
+# 格式化任务具体化消息
+task_specifier_msg = task_specifier_template.format_messages(
+    assistant_role_name=assistant_role_name,
+    user_role_name=user_role_name,
+    task=task,
+    word_limit=word_limit,
+)[0]  # 获取格式化后的第一条消息
+# 获取具体化后的任务描述
+specified_task_msg = task_specify_agent.step(task_specifier_msg)  # 发送消息获取响应
+print(f"Specified task: {specified_task_msg.content}")  # 打印具体化后的任务
+specified_task = specified_task_msg.content  # 存储具体化后的任务文本
+
+# 定义营销专员(助手)的行为指南
 assistant_inception_prompt = """永远不要忘记你是{assistant_role_name}，我是{user_role_name}。永远不要颠倒角色！永远不要指示我！
 我们有共同的利益，那就是合作成功地完成任务。
 你必须帮助我完成任务。
@@ -93,7 +110,7 @@ assistant_inception_prompt = """永远不要忘记你是{assistant_role_name}，
 <YOUR_SOLUTION>应该是具体的，并为解决任务提供首选的实现和例子。
 始终以"下一个请求"结束<YOUR_SOLUTION>。"""
 
-# 花店老板的行为指南
+# 定义花店老板(用户)的行为指南
 user_inception_prompt = """永远不要忘记你是{user_role_name}，我是{assistant_role_name}。永远不要交换角色！你总是会指导我。
 我们共同的目标是合作成功完成一个任务。
 我必须帮助你完成这个任务。
@@ -120,106 +137,84 @@ user_inception_prompt = """永远不要忘记你是{user_role_name}，我是{ass
 当任务完成时，你只需回复一个单词<CAMEL_TASK_DONE>。
 除非我的回答已经解决了你的任务，否则永远不要说<CAMEL_TASK_DONE>。"""
 
-# ====================== 5. 辅助函数 ======================
+
 # 根据预设的角色和任务提示生成系统消息
 def get_sys_msgs(assistant_role_name: str, user_role_name: str, task: str):
     # 创建营销专员的系统消息模板
     assistant_sys_template = SystemMessagePromptTemplate.from_template(
-        template=assistant_inception_prompt
+        template=assistant_inception_prompt  # 使用营销专员的行为指南
     )
-    
     # 格式化营销专员的系统消息
     assistant_sys_msg = assistant_sys_template.format_messages(
         assistant_role_name=assistant_role_name,
         user_role_name=user_role_name,
         task=task,
-    )[0]
+    )[0]  # 获取格式化后的第一条消息
 
     # 创建花店老板的系统消息模板
     user_sys_template = SystemMessagePromptTemplate.from_template(
-        template=user_inception_prompt
+        template=user_inception_prompt  # 使用花店老板的行为指南
     )
-
     # 格式化花店老板的系统消息
     user_sys_msg = user_sys_template.format_messages(
         assistant_role_name=assistant_role_name,
         user_role_name=user_role_name,
         task=task,
-    )[0]
+    )[0]  # 获取格式化后的第一条消息
 
-    return assistant_sys_msg, user_sys_msg
+    return assistant_sys_msg, user_sys_msg  # 返回两个角色的系统消息
 
-# ====================== 6. 任务具体化处理 ======================
-# 创建任务具体化的消息模板
-task_specifier_template = HumanMessagePromptTemplate.from_template(
-    template=task_specifier_prompt
+# 生成两个角色的系统消息
+assistant_sys_msg, user_sys_msg = get_sys_msgs(
+    assistant_role_name, user_role_name, specified_task  # 使用具体化后的任务
 )
 
-# 创建任务具体化的代理实例
-task_specify_agent = CAMELAgent(
-    task_specifier_sys_msg, 
-    ChatOpenAI(model_name='gpt-4', temperature=1.0)  # 使用 GPT-4 模型
+# 创建营销专员的代理实例
+assistant_agent = CAMELAgent(
+    assistant_sys_msg,  # 使用营销专员的系统消息
+    ChatOpenAI(temperature=0.2)  # 使用较低的随机性，确保回答的一致性
+)
+# 创建花店老板的代理实例
+user_agent = CAMELAgent(
+    user_sys_msg,  # 使用花店老板的系统消息
+    ChatOpenAI(temperature=0.2)  # 使用较低的随机性，确保回答的一致性
 )
 
-# 格式化任务具体化消息
-task_specifier_msg = task_specifier_template.format_messages(
-    assistant_role_name=assistant_role_name,
-    user_role_name=user_role_name,
-    task=task,
-    word_limit=word_limit,
-)[0]
+# 重置两个代理的对话历史
+assistant_agent.reset()
+user_agent.reset()
 
-# ====================== 7. 主执行流程 ======================
-if __name__ == "__main__":
-    # 获取具体化后的任务描述
-    specified_task_msg = task_specify_agent.step(task_specifier_msg)
-    print(f"Specified task: {specified_task_msg.content}")
-    specified_task = specified_task_msg.content
-
-    # 生成两个角色的系统消息
-    assistant_sys_msg, user_sys_msg = get_sys_msgs(
-        assistant_role_name, user_role_name, specified_task
+# 初始化对话互动，创建发送给营销专员的初始消息
+assistant_msg = HumanMessage(
+    content=(
+        f"{user_sys_msg.content}。"  # 添加花店老板的系统消息内容
+        "现在开始逐一给我介绍。"     # 开始指令
+        "只回复指令和输入。"         # 限制回复格式
     )
+)
 
-    # 创建两个角色的 Agent 实例，temperature=0.2 表示较低的随机性
-    assistant_agent = CAMELAgent(assistant_sys_msg, ChatOpenAI(temperature=0.2))
-    user_agent = CAMELAgent(user_sys_msg, ChatOpenAI(temperature=0.2))
+# 初始化用户消息并获取第一次响应
+user_msg = HumanMessage(content=f"{assistant_sys_msg.content}")  # 创建包含营销专员系统消息的人类消息
+user_msg = assistant_agent.step(user_msg)  # 获取营销专员的首次响应
 
-    # 重置两个 Agent 的对话历史
-    assistant_agent.reset()
-    user_agent.reset()
+# 打印原始任务和具体化后的任务
+print(f"Original task prompt:\n{task}\n")
+print(f"Specified task prompt:\n{specified_task}\n")
 
-    # 创建初始对话消息
-    assistant_msg = HumanMessage(
-        content=(
-            f"{user_sys_msg.content}。"  # 添加系统消息内容
-            "现在开始逐一给我介绍。"     # 开始指令
-            "只回复指令和输入。"         # 限制回复格式
-        )
-    )
+# 模拟对话交互，直到达到对话轮次上限或任务完成
+chat_turn_limit, n = 30, 0  # 设置最大对话轮次为30
+while n < chat_turn_limit:
+    n += 1  # 增加对话轮次计数
+    # 花店老板(用户)发送指令
+    user_ai_msg = user_agent.step(assistant_msg)  # 花店老板处理营销专员的消息
+    user_msg = HumanMessage(content=user_ai_msg.content)  # 创建人类消息
+    print(f"AI User ({user_role_name}):\n\n{user_msg.content}\n\n")  # 打印花店老板的消息
 
-    # 初始化用户消息并获取第一次响应
-    user_msg = HumanMessage(content=f"{assistant_sys_msg.content}")
-    user_msg = assistant_agent.step(user_msg)
-
-    # 打印原始任务和具体化后的任务
-    print(f"Original task prompt:\n{task}\n")
-    print(f"Specified task prompt:\n{specified_task}\n")
-
-    # 开始对话循环，最多进行 30 轮对话
-    chat_turn_limit, n = 30, 0
-    while n < chat_turn_limit:
-        n += 1
-        # 花店老板（用户）发送指令
-        user_ai_msg = user_agent.step(assistant_msg)
-        user_msg = HumanMessage(content=user_ai_msg.content)
-        print(f"AI User ({user_role_name}):\n\n{user_msg.content}\n\n")
-
-        # 营销专员（助手）回复方案
-        assistant_ai_msg = assistant_agent.step(user_msg)
-        assistant_msg = HumanMessage(content=assistant_ai_msg.content)
-        print(f"AI Assistant ({assistant_role_name}):\n\n{assistant_msg.content}\n\n")
-        
-        # 如果用户表示任务完成，则结束对话
-        if "<CAMEL_TASK_DONE>" in user_msg.content:
-            break
+    # 营销专员(助手)回复方案
+    assistant_ai_msg = assistant_agent.step(user_msg)  # 营销专员处理花店老板的消息
+    assistant_msg = HumanMessage(content=assistant_ai_msg.content)  # 创建人类消息
+    print(f"AI Assistant ({assistant_role_name}):\n\n{assistant_msg.content}\n\n")  # 打印营销专员的消息
+    
+    # 检查是否任务完成
+    if "<CAMEL_TASK_DONE>" in user_msg.content:  # 如果花店老板表示任务完成
+        break  # 结束对话循环
