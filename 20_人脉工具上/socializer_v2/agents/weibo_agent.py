@@ -7,6 +7,10 @@ from langchain.chat_models import ChatOpenAI
 from langchain.agents import initialize_agent, Tool
 from langchain.agents import AgentType
 
+# 导入环境变量管理库
+from dotenv import load_dotenv
+load_dotenv()
+
 # 通过LangChain代理找到UID的函数
 def lookup_V(flower_type: str) :
     # 初始化大模型
