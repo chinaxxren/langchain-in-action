@@ -61,8 +61,18 @@ user_role_name = "花店老板"          # 用户角色名称
 task = "整理出一个夏季玫瑰之夜的营销活动的策略"  # 任务描述
 word_limit = 50  # 任务具体化的字数限制
 
+########################################################################################3
+
 # 定义任务具体化的系统提示
 task_specifier_sys_msg = SystemMessage(content="你可以让任务更具体。")  # 创建系统消息
+# 创建任务具体化的代理实例
+task_specify_agent = CAMELAgent(
+    task_specifier_sys_msg,  # 使用任务具体化系统消息
+    ChatOpenAI(model_name = 'gpt-4', temperature=1.0)  # 使用GPT-4模型，高创造性设置
+)
+
+########################################################################################3
+
 # 定义任务具体化的提示模板
 task_specifier_prompt = """这是一个{assistant_role_name}将帮助{user_role_name}完成的任务：{task}。
 请使其更具体化。请发挥你的创意和想象力。
@@ -72,11 +82,7 @@ task_specifier_prompt = """这是一个{assistant_role_name}将帮助{user_role_
 task_specifier_template = HumanMessagePromptTemplate.from_template(
     template=task_specifier_prompt  # 使用上面定义的提示模板
 )
-# 创建任务具体化的代理实例
-task_specify_agent = CAMELAgent(
-    task_specifier_sys_msg,  # 使用任务具体化系统消息
-    ChatOpenAI(model_name = 'gpt-4', temperature=1.0)  # 使用GPT-4模型，高创造性设置
-)
+
 # 格式化任务具体化消息
 task_specifier_msg = task_specifier_template.format_messages(
     assistant_role_name=assistant_role_name,
@@ -84,10 +90,13 @@ task_specifier_msg = task_specifier_template.format_messages(
     task=task,
     word_limit=word_limit,
 )[0]  # 获取格式化后的第一条消息
+
 # 获取具体化后的任务描述
 specified_task_msg = task_specify_agent.step(task_specifier_msg)  # 发送消息获取响应
 print(f"Specified task: {specified_task_msg.content}")  # 打印具体化后的任务
 specified_task = specified_task_msg.content  # 存储具体化后的任务文本
+
+########################################################################################3
 
 # 定义营销专员(助手)的行为指南
 assistant_inception_prompt = """永远不要忘记你是{assistant_role_name}，我是{user_role_name}。永远不要颠倒角色！永远不要指示我！
@@ -164,7 +173,7 @@ def get_sys_msgs(assistant_role_name: str, user_role_name: str, task: str):
 
     return assistant_sys_msg, user_sys_msg  # 返回两个角色的系统消息
 
-# 生成两个角色的系统消息
+# 生成两个角色的系统消息(注意这里是系统消息，不是人类消息)
 assistant_sys_msg, user_sys_msg = get_sys_msgs(
     assistant_role_name, user_role_name, specified_task  # 使用具体化后的任务
 )
@@ -208,12 +217,12 @@ while n < chat_turn_limit:
     # 花店老板(用户)发送指令
     user_ai_msg = user_agent.step(assistant_msg)  # 花店老板处理营销专员的消息
     user_msg = HumanMessage(content=user_ai_msg.content)  # 创建人类消息
-    print(f"AI User ({user_role_name}):\n\n{user_msg.content}\n\n")  # 打印花店老板的消息
+    print(f"AI User {n} ({user_role_name}):\n\n{user_msg.content}\n\n")  # 打印花店老板的消息
 
     # 营销专员(助手)回复方案
     assistant_ai_msg = assistant_agent.step(user_msg)  # 营销专员处理花店老板的消息
     assistant_msg = HumanMessage(content=assistant_ai_msg.content)  # 创建人类消息
-    print(f"AI Assistant ({assistant_role_name}):\n\n{assistant_msg.content}\n\n")  # 打印营销专员的消息
+    print(f"AI Assistant {n} ({assistant_role_name}):\n\n{assistant_msg.content}\n\n")  # 打印营销专员的消息
     
     # 检查是否任务完成
     if "<CAMEL_TASK_DONE>" in user_msg.content:  # 如果花店老板表示任务完成
