@@ -79,31 +79,15 @@ class ChatbotWithRetrieval:
 def main():
     st.title("易速鲜花聊天客服")
     folder = "/Users/chinaxxren/AI/langchain-in-action/02_文档QA系统/OneFlower"
-    
-    # 初始化聊天历史
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    
-    # 初始化机器人
     if "bot" not in st.session_state:
         st.session_state.bot = ChatbotWithRetrieval(folder)
 
-    # 显示聊天历史
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # 聊天输入框
-    if prompt := st.chat_input("请输入您的问题..."):
-        # 添加用户消息
-        st.chat_message("user").markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-
-        # 获取机器人响应
-        with st.chat_message("assistant"):
-            response = st.session_state.bot.qa.invoke({"question": prompt})
-            st.markdown(response['answer'])
-            st.session_state.messages.append({"role": "assistant", "content": response['answer']})
+    user_input = st.text_input("请输入你的问题：")
+    
+    if user_input:
+        # 使用 invoke 方法替代直接调用
+        response = st.session_state.bot.qa.invoke({"question": user_input})
+        st.write(f"Chatbot: {response['answer']}")
 
 if __name__ == "__main__":
     main()

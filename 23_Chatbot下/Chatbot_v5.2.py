@@ -2,17 +2,14 @@
 import os
 import gradio as gr
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Qdrant
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_community.vectorstores import Qdrant
 from langchain.memory import ConversationSummaryMemory
-from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import Docx2txtLoader
-from langchain.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 
-from dotenv import load_dotenv  # 用于加载环境变量
-load_dotenv()  # 加载 .env 文件中的环境变量
+from dotenv import load_dotenv
+load_dotenv()
 
 class ChatbotWithRetrieval:
     def __init__(self, dir):
@@ -70,16 +67,23 @@ class ChatbotWithRetrieval:
         return self.conversation_history
 
 if __name__ == "__main__":
-    folder = "OneFlower"
+    folder = "/Users/chinaxxren/AI/langchain-in-action/02_文档QA系统/OneFlower"
     bot = ChatbotWithRetrieval(folder)
 
-    # 定义 Gradio 界面
+    # 使用更简单的 Gradio 配置
     interface = gr.Interface(
-        fn=bot.get_response,  # 使用我们刚刚创建的函数
-        inputs="text",  # 输入是文本
-        outputs="text",  # 输出也是文本
-        live=False,  # 实时更新，这样用户可以连续与模型交互
-        title="易速鲜花智能客服",  # 界面标题
-        description="请输入问题，然后点击提交。"  # 描述
+        fn=bot.get_response,
+        inputs=gr.Textbox(lines=2, placeholder="请输入您的问题..."),
+        outputs=gr.Textbox(lines=10, label="对话历史"),
+        title="易速鲜花智能客服",
+        description="请输入问题，然后点击提交。",
+        allow_flagging="never",
+        cache_examples=False
     )
-    interface.launch()  # 启动 Gradio 界面
+    
+    # 使用基本配置启动
+    interface.launch(
+        server_port=7860,
+        share=False,
+        debug=True
+    )

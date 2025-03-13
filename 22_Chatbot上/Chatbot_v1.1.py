@@ -4,7 +4,7 @@ load_dotenv()  # 加载 .env 文件中的环境变量
 
 # 导入所需的库和模块
 from langchain.schema import HumanMessage, SystemMessage
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 
 # 定义一个命令行聊天机器人的类
 class CommandlineChatbot:
@@ -18,13 +18,12 @@ class CommandlineChatbot:
         print("Chatbot 已启动! 输入'exit'来退出程序。")
         while True:
             user_input = input("你: ")
-            # 如果用户输入“exit”，则退出循环
             if user_input.lower() == 'exit':
                 print("再见!")
                 break
-            # 将用户的输入添加到消息列表中，并获取机器人的响应
+            # 使用 invoke 方法替代直接调用
             self.messages.append(HumanMessage(content=user_input))
-            response = self.chat(self.messages)
+            response = self.chat.invoke(self.messages)
             print(f"Chatbot: {response.content}")
 
 # 如果直接运行这个脚本，启动聊天机器人

@@ -7,7 +7,7 @@ from langchain.schema import (
     HumanMessage,
     SystemMessage
 )
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI  # 更新导入路径
 
 # 创建一个聊天模型的实例
 chat = ChatOpenAI()
@@ -19,8 +19,8 @@ messages = [
 ]
 
 # 使用聊天模型获取响应
-response = chat(messages)
-print(response)
+response = chat.invoke(messages)  # 使用 invoke 方法替代直接调用
+print(response.content)
 
 
 
