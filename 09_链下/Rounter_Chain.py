@@ -1,11 +1,14 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
 import warnings
 warnings.filterwarnings('ignore')
 
-from dotenv import load_dotenv  # 用于加载环境变量
-load_dotenv()  # 加载 .env 文件中的环境变量
+from dotenv import load_dotenv
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from langchain_core.output_parsers import RouterOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from operator import itemgetter
+
+load_dotenv()
 
 # 构建两个场景的模板
 flower_care_template = """
@@ -35,88 +38,67 @@ prompt_infos = [
 ]
 
 # 初始化语言模型
-from langchain.llms import OpenAI
 llm = OpenAI()
 
-# 构建目标链
-from langchain.chains.llm import LLMChain
-from langchain.prompts import PromptTemplate
-
-chain_map = {}
-
+# 创建链的映射
+chains = {}
 for info in prompt_infos:
     prompt = PromptTemplate(
         template=info['template'],
         input_variables=["input"]
     )
-    print("目标提示:\n", prompt)
-    
-    chain = LLMChain(
-        llm=llm,
-        prompt=prompt,
-        verbose=True
-    )
-    chain_map[info["key"]] = chain
+    chain = prompt | llm
+    chains[info["key"]] = chain
 
-print("*" * 60)
-
-# 构建路由链
-from langchain.chains.router.llm_router import LLMRouterChain, RouterOutputParser
-from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMPLATE as RounterTemplate
-
+# 创建路由器链
 destinations = [f"{p['key']}: {p['description']}" for p in prompt_infos]
-router_template = RounterTemplate.format(destinations="\n".join(destinations))
-print("路由模板:\n", router_template)
+router_template = """Given a raw text input to a language model select the model prompt best suited for the input.
+You will be given the names of the available prompts and a description of what the prompt is best suited for.
+
+<< PROMPTS >>
+{destinations}
+
+<< INPUT >>
+{{input}}
+
+<< OUTPUT >>
+Return the name of the most suitable prompt from the available prompts above. If none are suitable, return "DEFAULT".
+"""
 
 router_prompt = PromptTemplate(
     template=router_template,
     input_variables=["input"],
-    output_parser=RouterOutputParser(),
-)
-print("路由提示:\n", router_prompt)
-
-#工作流程：
-# - 接收用户输入的问题
-# - 分析问题的内容和意图
-# - 根据预定义的目标（destinations）选择最合适的处理链
-# - 将问题转发给选中的链处理
-router_chain = LLMRouterChain.from_llm(
-    llm,            # 语言模型
-    router_prompt,  # 路由提示模板
-    verbose=True    # 显示详细信息
+    partial_variables={"destinations": "\n".join(destinations)}
 )
 
-# 构建默认链
-from langchain.chains import ConversationChain
+router_chain = router_prompt | llm
 
-default_chain = ConversationChain(
-    llm=llm,
-    output_key="text",
-    verbose=True
+# 创建默认链
+default_prompt = PromptTemplate(
+    template="Question: {input}\nAnswer:",
+    input_variables=["input"]
 )
+default_chain = default_prompt | llm
 
-# 构建多提示链
-from langchain.chains.router import MultiPromptChain
+# 组合链
+def route_and_run(input_text: str):
+    # 确定路由
+    destination = router_chain.invoke({"input": input_text})
+    destination = destination.strip().lower()
+    
+    # 选择合适的链
+    if destination in chains:
+        return chains[destination].invoke({"input": input_text})
+    return default_chain.invoke({"input": input_text})
 
-#- 在这个例子中，路由会在两个专门的链之间选择：
-# - flower_care ：处理花卉护理相关问题
-# - flower_decoration ：处理花卉装饰相关问题
-# - 如果都不匹配，则使用默认链处理
+# 测试代码
+test_inputs = [
+    "如何为玫瑰浇水？",
+    "如何为婚礼场地装饰花朵？",
+    "如何区分阿豆和罗豆？"
+]
 
-# - 实际应用效果：
-# - "如何为玫瑰浇水？" → 路由到 flower_care 链
-# - "如何为婚礼场地装饰花朵？" → 路由到 flower_decoration 链
-# - "如何区分阿豆和罗豆？" → 使用默认链处理
-chain = MultiPromptChain(
-    router_chain=router_chain,
-    destination_chains=chain_map,
-    default_chain=default_chain,
-    verbose=True
-)
-
-# 测试1
-print(chain.run("如何为玫瑰浇水？"))
-# 测试2              
-print(chain.run("如何为婚礼场地装饰花朵？"))
-# 测试3         
-print(chain.run("如何区分阿豆和罗豆？"))
+for test_input in test_inputs:
+    print(f"\n问题: {test_input}")
+    print("回答:", route_and_run(test_input))
+    print("-" * 50)
