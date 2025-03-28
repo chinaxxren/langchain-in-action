@@ -1,15 +1,12 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
 from dotenv import load_dotenv  # 用于加载环境变量
-load_dotenv()  # 加载 .env 文件中的环境变量
-
-# 导入OpenAI Key
-import os
-# os.environ["OPENAI_API_KEY"] = '你的OpenAI API Key'
-
 # 导入LangChain中的提示模板
 from langchain.prompts import PromptTemplate
+# 导入结构化输出解析器和ResponseSchema
+from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+import json
+
+load_dotenv()  # 加载 .env 文件中的环境变量
+
 # 创建提示模板
 prompt_template = """您是一位专业的鲜花店文案撰写员。
 对于售价为 {price} 元的 {flower_name} ，您能提供一个吸引人的简短描述吗？
@@ -20,8 +17,6 @@ from langchain_openai import OpenAI
 # 创建模型实例
 model = OpenAI(model_name='gpt-3.5-turbo-instruct')
 
-# 导入结构化输出解析器和ResponseSchema
-from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 # 定义我们想要接收的响应模式
 response_schemas = [
     ResponseSchema(name="description", description="鲜花的描述文案"),
@@ -40,9 +35,8 @@ prompt = PromptTemplate.from_template(prompt_template,
 flowers = ["玫瑰", "百合", "康乃馨"]
 prices = ["50", "30", "20"]
 
-# 创建一个空的DataFrame用于存储结果
-import pandas as pd
-df = pd.DataFrame(columns=["flower", "price", "description", "reason"]) # 先声明列名
+# 创建一个列表用于存储所有结果
+results = []
 
 for flower, price in zip(flowers, prices):
     # 根据提示准备模型的输入
@@ -51,18 +45,23 @@ for flower, price in zip(flowers, prices):
     # 获取模型的输出
     output = model.invoke(input)
     
-    # 解析模型的输出（这是一个字典结构）
+    # 解析模型的输出
     parsed_output = output_parser.parse(output)
 
-    # 在解析后的输出中添加“flower”和“price”
+    # 添加flower和price信息
     parsed_output['flower'] = flower
     parsed_output['price'] = price
 
-    # 将解析后的输出添加到DataFrame中
-    df.loc[len(df)] = parsed_output  
+    # 将结果添加到列表中
+    results.append(parsed_output)
 
-# 打印字典
-print(df.to_dict(orient='records'))
+# json.dumps(obj, **kwargs)
+# ### 主要参数说明
+# 1. **obj**: 要序列化的 Python 对象（如字典、列表等）
+# 2. **ensure_ascii**: 默认为 True，设为 False 时允许输出非 ASCII 字符（如中文）
+# 3. **indent**: 缩进格式化，设置缩进空格数
+# 4. **sort_keys**: 是否按键排序，默认为 False
+# 5. **separators**: 自定义分隔符，默认为 (', ', ': ')
 
-# 保存DataFrame到CSV文件
-df.to_csv("flowers_with_descriptions.csv", index=False)
+# 只保留控制台输出部分
+print(json.dumps(results, ensure_ascii=False, indent=2))

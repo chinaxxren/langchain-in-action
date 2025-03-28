@@ -1,12 +1,4 @@
-import warnings
-warnings.filterwarnings('ignore')
-
 from dotenv import load_dotenv
-from langchain_core.prompts import PromptTemplate
-from langchain_openai import OpenAI
-from langchain_core.output_parsers import RouterOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from operator import itemgetter
 
 load_dotenv()
 
@@ -38,67 +30,72 @@ prompt_infos = [
 ]
 
 # 初始化语言模型
+from langchain.llms import OpenAI
 llm = OpenAI()
 
-# 创建链的映射
-chains = {}
+# 构建目标链
+from langchain.chains.llm import LLMChain
+from langchain.prompts import PromptTemplate
+
+chain_map = {}
+
 for info in prompt_infos:
     prompt = PromptTemplate(
         template=info['template'],
         input_variables=["input"]
     )
-    chain = prompt | llm
-    chains[info["key"]] = chain
+    print("目标提示:\n", prompt)
+    
+    chain = LLMChain(
+        llm=llm,
+        prompt=prompt,
+        verbose=True
+    )
+    chain_map[info["key"]] = chain
 
-# 创建路由器链
+# 构建路由链
+from langchain.chains.router.llm_router import LLMRouterChain, RouterOutputParser
+from langchain.chains.router.multi_prompt_prompt import MULTI_PROMPT_ROUTER_TEMPLATE as RounterTemplate
+
 destinations = [f"{p['key']}: {p['description']}" for p in prompt_infos]
-router_template = """Given a raw text input to a language model select the model prompt best suited for the input.
-You will be given the names of the available prompts and a description of what the prompt is best suited for.
-
-<< PROMPTS >>
-{destinations}
-
-<< INPUT >>
-{{input}}
-
-<< OUTPUT >>
-Return the name of the most suitable prompt from the available prompts above. If none are suitable, return "DEFAULT".
-"""
+router_template = RounterTemplate.format(destinations="\n".join(destinations))
+print("路由模板:\n", router_template)
 
 router_prompt = PromptTemplate(
     template=router_template,
     input_variables=["input"],
-    partial_variables={"destinations": "\n".join(destinations)}
+    output_parser=RouterOutputParser(),
+)
+print("路由提示:\n", router_prompt)
+
+router_chain = LLMRouterChain.from_llm(
+    llm,
+    router_prompt,
+    verbose=True
 )
 
-router_chain = router_prompt | llm
+# 构建默认链
+from langchain.chains import ConversationChain
 
-# 创建默认链
-default_prompt = PromptTemplate(
-    template="Question: {input}\nAnswer:",
-    input_variables=["input"]
+default_chain = ConversationChain(
+    llm=llm,
+    output_key="text",
+    verbose=True
 )
-default_chain = default_prompt | llm
 
-# 组合链
-def route_and_run(input_text: str):
-    # 确定路由
-    destination = router_chain.invoke({"input": input_text})
-    destination = destination.strip().lower()
-    
-    # 选择合适的链
-    if destination in chains:
-        return chains[destination].invoke({"input": input_text})
-    return default_chain.invoke({"input": input_text})
+# 构建多提示链
+from langchain.chains.router import MultiPromptChain
 
-# 测试代码
-test_inputs = [
-    "如何为玫瑰浇水？",
-    "如何为婚礼场地装饰花朵？",
-    "如何区分阿豆和罗豆？"
-]
+chain = MultiPromptChain(
+    router_chain=router_chain,
+    destination_chains=chain_map,
+    default_chain=default_chain,
+    verbose=True
+)
 
-for test_input in test_inputs:
-    print(f"\n问题: {test_input}")
-    print("回答:", route_and_run(test_input))
-    print("-" * 50)
+# 测试1
+print(chain.run("如何为玫瑰浇水？"))
+# 测试2              
+print(chain.run("如何为婚礼场地装饰花朵？"))
+# 测试3         
+print(chain.run("如何区分阿豆和罗豆？"))

@@ -1,11 +1,12 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
+
 # 导入所需要的库和模块
 from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from typing import List
-from dotenv import load_dotenv
+from dotenv import load_dotenv# 从langchain库导入所需的模块
+from langchain_openai import ChatOpenAI  # 改用 ChatOpenAI
+from langchain.output_parsers import OutputFixingParser
+
 load_dotenv()
 
 # 使用Pydantic创建一个数据格式，表示花
@@ -23,10 +24,6 @@ misformatted = "{'name': '康乃馨', 'colors': ['粉红色','白色','红色','
 parser = PydanticOutputParser(pydantic_object=Flower)
 # 使用Pydantic解析器解析不正确的输出
 # parser.parse(misformatted) # 这行代码会出错
-
-# 从langchain库导入所需的模块
-from langchain_openai import ChatOpenAI  # 改用 ChatOpenAI
-from langchain.output_parsers import OutputFixingParser
 
 # 使用OutputFixingParser创建一个新的解析器，该解析器能够纠正格式不正确的输出
 new_parser = OutputFixingParser.from_llm(parser=parser, llm=ChatOpenAI())

@@ -1,13 +1,11 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
 # 导入HuggingFace API Token
 from dotenv import load_dotenv
 import os
-load_dotenv()
-
 # 设置 HuggingFace 令牌
 import huggingface_hub
+
+load_dotenv()
+
 huggingface_hub.login(token=os.getenv("HUGGINGFACE_API_TOKEN"))
 
 # 导入必要的库

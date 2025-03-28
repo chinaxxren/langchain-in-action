@@ -1,8 +1,12 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
-
 from dotenv import load_dotenv  # 用于加载环境变量
+from langchain_openai import OpenAI
+from langchain.prompts.prompt import PromptTemplate
+from langchain.prompts.few_shot import FewShotPromptTemplate
+from langchain.prompts.example_selector.semantic_similarity import SemanticSimilarityExampleSelector  # 更新导入路径
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+import os
+
 load_dotenv()  # 加载 .env 文件中的环境变量
 
 # 1. 创建一些示例
@@ -31,14 +35,12 @@ samples = [
 ]
 
 # 2. 创建一个提示模板
-from langchain.prompts.prompt import PromptTemplate
 prompt_sample = PromptTemplate(input_variables=["flower_type", "occasion", "ad_copy"], 
                                template="鲜花类型: {flower_type}\n场合: {occasion}\n文案: {ad_copy}")
-print(prompt_sample.format(**samples[0]))
+print(prompt_sample.format(**samples[1]))
 print("*0" * 30)
 
 # 3. 创建一个FewShotPromptTemplate对象
-from langchain.prompts.few_shot import FewShotPromptTemplate
 prompt = FewShotPromptTemplate(
     examples=samples,
     example_prompt=prompt_sample,
@@ -49,8 +51,6 @@ print(prompt.format(flower_type="野玫瑰", occasion="爱情"))
 print("*1" * 30)
 
 # 4. 把提示传递给大模型
-import os
-from langchain_openai import OpenAI
 model = OpenAI(
     model="gpt-3.5-turbo-instruct",
     temperature=0.7
@@ -60,11 +60,6 @@ print(result)
 print("*2" * 30)
 
 # 5. 使用示例选择器
-from langchain.prompts.example_selector.semantic_similarity import SemanticSimilarityExampleSelector  # 更新导入路径
-from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-
-# 初始化示例选择器
 example_selector = SemanticSimilarityExampleSelector.from_examples(
     samples,
     OpenAIEmbeddings(
@@ -75,14 +70,25 @@ example_selector = SemanticSimilarityExampleSelector.from_examples(
     k=1
 )
 
+
 # 创建一个使用示例选择器的FewShotPromptTemplate对象
 prompt = FewShotPromptTemplate(
     example_selector=example_selector, 
     example_prompt=prompt_sample, 
-    suffix="鲜花类型: {flower_type}\n场合: {occasion}", 
+    suffix="鲜花类型: {flower_type}\n场合: {occasion}", #意思是提交给大模型时候这段话显示在最后
+    example_prompt=prompt_sample,
     input_variables=["flower_type", "occasion"]
 )
 print(prompt.format(flower_type="红玫瑰", occasion="爱情"))
+
+### suffix 的特点
+
+# 1. 它是模型最终需要回答的问题
+# 2. 它会出现在所有示例之后
+# 3. 它可以包含变量（使用 `{变量名}` 格式）
+# 4. 这些变量必须在 `input_variables` 中声明
+
+# 所以，FewShotPromptTemplate中的`suffix` 实际上就是在告诉模型："看完了上面的例子后，请针对这个新情况（suffix中描述的）给出回答"。
 
 
 

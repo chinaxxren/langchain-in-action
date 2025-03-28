@@ -1,8 +1,17 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
-
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
+from langchain.output_parsers import OutputFixingParser
+from langchain_openai import ChatOpenAI  # 更新导入路径
+from langchain.output_parsers import RetryWithErrorOutputParser
+from langchain_openai import OpenAI  # 更新导入路径
+
+# PydanticOutputParser
+# 主要来修复不符合预期格式的输出
+# 使用LLM来理解和纠正格式错误
+# 将不规范的输出转换为符合预期格式的输出
+
 load_dotenv()
 
 # 定义一个模板字符串，这个模板将用于生成提问
@@ -12,17 +21,14 @@ Question: {query}
 Response:"""
 
 # 定义一个Pydantic数据格式，这个格式描述了一个"行动"类及其属性
-from pydantic import BaseModel, Field
 class Action(BaseModel):
     action: str = Field(description="action to take")
     action_input: str = Field(description="input to the action")
 
 # 使用Pydantic格式Action来初始化一个输出解析器
-from langchain.output_parsers import PydanticOutputParser
 parser = PydanticOutputParser(pydantic_object=Action)
 
 # 定义一个提示模板，它将用于向模型提问
-from langchain.prompts import PromptTemplate
 prompt = PromptTemplate(
     template="Answer the user query.\n{format_instructions}\n{query}\n",
     input_variables=["query"],
@@ -34,19 +40,11 @@ prompt_value = prompt.format_prompt(query="What are the colors of Orchid?")
 bad_response = '{"action": "search"}'
 # parser.parse(bad_response) # 如果直接解析，它会引发一个错误
 
-
-# 使用OutputFixingParser来解决这个问题
-from langchain.output_parsers import OutputFixingParser
-from langchain_openai import ChatOpenAI  # 更新导入路径
-
 fix_parser = OutputFixingParser.from_llm(parser=parser, llm=ChatOpenAI())
 parse_result = fix_parser.parse(bad_response)
 print('OutputFixingParser的parse结果:',parse_result)
 
 # 初始化RetryWithErrorOutputParser
-from langchain.output_parsers import RetryWithErrorOutputParser
-from langchain_openai import OpenAI  # 更新导入路径
-
 retry_parser = RetryWithErrorOutputParser.from_llm(
     parser=parser, llm=OpenAI(temperature=0)
 )

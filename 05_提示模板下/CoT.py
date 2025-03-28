@@ -9,10 +9,11 @@
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 # 设置环境变量和API密钥
 from dotenv import load_dotenv  # 用于加载环境变量
-load_dotenv()  # 加载 .env 文件中的环境变量
-
 # 创建聊天模型
 from langchain_openai import ChatOpenAI  # 更新导入路径
+
+load_dotenv()  # 加载 .env 文件中的环境变量
+
 llm = ChatOpenAI(temperature=0)
 
 # 设定 AI 的角色和目标
@@ -43,7 +44,7 @@ cot_template = """
 """
 
 # 设定 AI 的角色
-system_prompt_ro
+system_prompt_role = SystemMessagePromptTemplate.from_template(role_template)
 # 设定 AI 的目标
 system_prompt_cot = SystemMessagePromptTemplate.from_template(cot_template)
 
