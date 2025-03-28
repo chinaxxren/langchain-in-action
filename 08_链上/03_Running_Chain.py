@@ -1,62 +1,53 @@
-'''欢迎来到LangChain实战课
-https://time.geekbang.org/column/intro/100617601
-作者 黄佳'''
-
 from dotenv import load_dotenv
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import OpenAI
+from typing import List, Dict  # 导入类型注解所需的类型
+
+# 加载环境变量
 load_dotenv()
 
-# 导入所需库
-from langchain import PromptTemplate, OpenAI, LLMChain
-
 # 设置提示模板
+# input_variables: 定义模板中需要替换的变量
+# template: 定义提示模板的具体内容
 prompt = PromptTemplate(
     input_variables=["flower", "season"],
     template="{flower}在{season}的花语是?"
 )
 
 # 初始化大模型
+# temperature=0: 使输出更加确定性，降低随机性
 llm = OpenAI(temperature=0)
 
-# 初始化链
-llm_chain = LLMChain(llm=llm, prompt=prompt)
+# 创建链
+# 使用 | 运算符将提示模板和模型连接成链
+chain = prompt | llm
 
-print("*" * 60)
-
-# 1，调用链，- 返回完整的响应对象，包含输出和其他元数据
-response = llm_chain({
+# 1. 使用 invoke 方法处理单个输入
+# invoke 方法接受一个字典作为输入，字典的键需要与模板中的变量名匹配
+response = chain.invoke({
     'flower': "玫瑰",
     'season': "夏季"
 })
 print(response)
-print("*" * 60)
-#{'flower': '玫瑰', 'season': '夏季', 'text': '\n\n夏季的花语是热情、热爱、幸福和欢乐。'}
+print("*" * 60)  # 分隔线
 
-# 2，run方法，- 只返回生成的文本结果
-result = llm_chain.run({
+# 展示 invoke 方法的另一个示例
+result = chain.invoke({
     'flower': "玫瑰",
     'season': "夏季"
 })
 print(result)
 print("*" * 60)
-#夏季的花语是: 热情、欢乐、爱情、美好、繁荣、生机
 
-# 3，predict方法
-result = llm_chain.predict(flower="玫瑰", season="夏季")
-print(result)
-print("*" * 60)
-#夏季的花语是热情、浪漫、繁荣和美丽。
-
-# 4，apply方法允许您针对输入列表运行链
-input_list = [
+# 2. 准备批量处理的输入数据
+# 使用类型注解指定列表中包含字典
+input_list: List[Dict[str, str]] = [
     {"flower": "玫瑰", 'season': "夏季"},
     {"flower": "百合", 'season': "春季"},
     {"flower": "郁金香", 'season': "秋季"}
 ]
-# 返回结果列表- 适合需要处理多个相似查询的场景
-result = llm_chain.apply(input_list)
-print(result)
-print("*" * 60)
 
-# generate方法，- 适合需要详细跟踪和分析的场景
-result = llm_chain.generate(input_list)
-print(result)
+# 3. 使用 batch 方法批量处理多个输入
+# batch 方法接受一个输入列表，返回对应的输出列表
+results = chain.batch(input_list)
+print(results)
