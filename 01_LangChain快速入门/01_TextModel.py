@@ -4,6 +4,7 @@ load_dotenv()  # 加载 .env 文件中的环境变量
 
 import os  # 添加 os 模块导入
 
+# 直接调用 OpenAI 的库
 from openai import OpenAI
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),

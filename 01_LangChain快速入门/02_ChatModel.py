@@ -4,9 +4,10 @@ https://time.geekbang.org/column/intro/100617601
 
 from dotenv import load_dotenv  # 用于加载环境变量
 load_dotenv()  # 加载 .env 文件中的环境变量
-
+# 直接调用 OpenAI 的库
 from openai import OpenAI
 import os
+
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     base_url=os.getenv("OPENAI_API_BASE")
