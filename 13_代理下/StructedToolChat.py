@@ -58,7 +58,7 @@ async def main():
     1. First, extract all h1-h6 heading elements
     2. For each heading, get its text content and level
     3. Return a structured list of headings with their hierarchy
-    Note: Focus only on HTML heading elements to avoid non-HTML node errors
+    Note: Focus only on HTML he                                                                                                                                                                                                                                                                                                                                                                        ading elements to avoid non-HTML node errors
     """
     response = await agent_chain.ainvoke(query)
     

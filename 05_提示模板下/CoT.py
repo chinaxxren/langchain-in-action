@@ -4,11 +4,17 @@
 # - 定义为花店电商公司的 AI 助手
 # - 目标是帮助客户选择合适的花卉
 # 2. 思维链模板设计：
-# - 包含详细的思考步骤：理解需求 → 考虑花卉涵义 → 给出推荐
+# - 包含详细的思考步骤：理解需求 → 思考问题 → 给出推荐
 
-from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
+from langchain.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+)
+
 # 设置环境变量和API密钥
 from dotenv import load_dotenv  # 用于加载环境变量
+
 # 创建聊天模型
 from langchain_openai import ChatOpenAI  # 更新导入路径
 
@@ -17,7 +23,9 @@ load_dotenv()  # 加载 .env 文件中的环境变量
 llm = ChatOpenAI(temperature=0)
 
 # 设定 AI 的角色和目标
-role_template = "你是一个为花店电商公司工作的AI助手, 你的目标是帮助客户根据他们的喜好做出明智的决定"
+role_template = (
+    "你是一个为花店电商公司工作的AI助手, 你的目标是帮助客户根据他们的喜好做出明智的决定"
+)
 
 # CoT 的关键部分，AI 解释推理过程，并加入一些先前的对话示例（Few-Shot Learning）
 cot_template = """
@@ -53,14 +61,18 @@ human_template = "{human_input}"
 human_prompt = HumanMessagePromptTemplate.from_template(human_template)
 
 # 将以上所有信息结合为一个聊天提示
-chat_prompt = ChatPromptTemplate.from_messages([
-    system_prompt_role,     # 角色定义
-    system_prompt_cot,      # 思维链模板
-    human_prompt           # 用户输入
-])
+chat_prompt = ChatPromptTemplate.from_messages(
+    [
+        system_prompt_role,  # 角色定义
+        system_prompt_cot,  # 思维链模板
+        human_prompt,  # 用户输入
+    ]
+)
 
 # 生成提示
-prompt = chat_prompt.format_prompt(human_input="我想为我的女朋友购买一些花。她喜欢粉色和紫色。你有什么建议吗?").to_messages()
+prompt = chat_prompt.format_prompt(
+    human_input="我想为我的女朋友购买一些花。她喜欢粉色和紫色。你有什么建议吗?"
+).to_messages()
 
 # 接收用户的询问，返回回答结果
 response = llm.invoke(prompt)  # 使用 invoke 方法替代直接调用

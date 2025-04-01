@@ -1,13 +1,6 @@
-
-# 导入环境变量管理库并加载环境变量
 from dotenv import load_dotenv
-load_dotenv()  # 从.env文件加载环境变量到程序中
-
-# 导入所需的库
 from typing import List  # 用于类型提示
-# 导入OpenAI聊天模型
 from langchain_openai import ChatOpenAI
-# 导入消息模板相关类
 from langchain.prompts.chat import (
     SystemMessagePromptTemplate,  # 用于创建系统消息的模板
     HumanMessagePromptTemplate,   # 用于创建人类消息的模板
@@ -19,6 +12,9 @@ from langchain.schema import (
     SystemMessage,  # 系统指令的消息类型
     BaseMessage,    # 所有消息类型的基类
 )
+
+load_dotenv()
+
 
 # 定义CAMELAgent类，用于管理与语言模型的交互
 class CAMELAgent:
@@ -54,7 +50,7 @@ class CAMELAgent:
         self.update_messages(output_message)   # 将响应添加到历史
 
         return output_message  # 返回模型响应
-    
+
 # 设置对话角色和任务
 assistant_role_name = "花店营销专员"  # 助手角色名称
 user_role_name = "花店老板"          # 用户角色名称
@@ -196,9 +192,9 @@ user_agent.reset()
 # 初始化对话互动，创建发送给营销专员的初始消息
 assistant_msg = HumanMessage(
     content=(
-        f"{user_sys_msg.content}。"  # 添加花店老板的系统消息内容
-        "现在开始逐一给我介绍。"     # 开始指令
-        "只回复指令和输入。"         # 限制回复格式
+        f"{user_sys_msg.content}。" # 添加花店老板的系统消息内容
+        "现在开始逐一给我介绍。" # 开始指令
+        "只回复指令和输入。" # 限制回复格式
     )
 )
 
